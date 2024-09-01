@@ -1,5 +1,7 @@
-import {NextResponse} from 'next/server'
-import OpenAI from 'openai'
+import { NextResponse } from 'next/server'
+
+// Replace with Gemini-specific import if needed
+// import Gemini from 'gemini-api' (hypothetical)
 
 const systemPrompt = `
 You are a flashcard creator. Your goal is to generate effective and concise flashcards that help users learn and retain key concepts. Follow these guidelines:
@@ -20,6 +22,8 @@ You are a flashcard creator. Your goal is to generate effective and concise flas
 
 7. **Feedback**: Encourage users to review their answers and reflect on their learning process.
 
+8. Will only generate 10 flashcards.
+
 Your flashcards should be educational, engaging, and effective for various subjects and learning styles.
 
 Return in the following JSON Format 
@@ -32,19 +36,37 @@ Return in the following JSON Format
         ]
 }
 `
-export async function POST(req){
-    const openai = OpenAI()
+
+export async function POST(req) {
     const data = await req.text()
+    
+    // Construct the payload for Gemini API request
+    const payload = {
+        prompt: systemPrompt + "\n" + data,
+        maxTokens: 200, // Adjust as needed
+        temperature: 0.7, // Adjust as needed
+        format: "json", // Assuming Gemini has a format parameter
+    }
 
-    const comepletion = await openai.chat.comepletion.create({
-        messages:[
-            {role: "system", content: SystemPrompt},
-            {role: "user", content: data}
-        ],
-        model: "gpt-4o",
-        response_format: {type: 'json_object'},
-    }) 
-    const flashcards = JSON.parse(compeletion.choices[0].message.content)
+    try {
+        const response = await fetch('https://generativelanguage.googleapis.com', { // Replace with the correct Gemini API URL
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`, // Ensure you have the GEMINI_API_KEY in your environment variables
+            },
+            body: JSON.stringify(payload),
+        })
 
-    return NextResponse.json(flashcards.flashcard)
+        const completion = await response.json()
+
+        // Parse the response based on the assumed structure of Gemini's response
+        const flashcards = JSON.parse(completion.choices[0].message.content) // Adjust this based on Gemini's actual response structure
+
+        return NextResponse.json(flashcards.flashcards)
+
+    } catch (error) {
+        console.error("Error fetching from Gemini API:", error)
+        return NextResponse.json({ error: "Failed to generate flashcards." }, { status: 500 })
+    }
 }
